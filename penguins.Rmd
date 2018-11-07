@@ -1,0 +1,98 @@
+---
+title: "penguin"
+author: "Yirui Zhang"
+date: "November 6, 2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+```{r}
+install.packages(onewaytests)
+library(tidyverse)
+library(car)
+library(onewaytests)
+
+penguins <- read_csv("penguins.csv")
+```
+ our questions:
+ is there a significant difference in mean flipper length for female penguins by species (chinstrap, gentoo, and adelie?)
+ 
+ 2. do some exploring
+ 
+ new function: with+table for easy counting over multiple factors.
+ update the species usung case_when
+ 
+
+```{r}
+counts <- with(penguins, table( species, sex))
+
+penguins2<- penguins %>% 
+  mutate(common_name =  
+           case_when(
+             species == "Chinstrap penguin (Pygoscelis antarctica)" ~ "Chinstrap",
+             species == "Gentoo penguin (Pygoscelis papua)" ~ "Gento",
+             species == "Adelie Penguin (Pygoscelis adeliae)" ~ "Adelie"
+           )
+         ) %>% 
+  select(-species) %>% 
+  filter(sex =="FEMALE")
+```
+```{r}
+hist <- ggplot(penguins2, aes(c = flipper_length))+
+  geom_histogram(aes(fill = common_name))+
+  facet_wrap(~common_name)
+hist
+
+#QQ plot  
+
+
+
+
+# Levene's test for equal variances (?2 groups.. if you have two groups, use the F-test for equal variances)
+#we will use the function levenetest from the car package
+
+#H0: variance is equal
+#HA: variance is not equal
+penguin_levene <- leveneTest(flipper_length ~ common_name, data = penguins2)
+penguin_levene
+
+#we will retains the null ypothesis of equal variances(p = 0.06)
+
+#group_by  summarize
+variance <-penguins2 %>% 
+  group_by(common_name) %>% 
+  summarize(
+    variance = var(flipper_length)
+  )
+variance
+
+```
+ 
+ #3. one-way ANOVA
+ single factor: common_name (species)
+ number of levels in the factor: 3 (c, g, a)
+ randam variable: flipper_length(mm)
+ 
+ is there a significant difference in mean flipper length for female C G and A penguins?
+ 
+```{r}
+#H0: mean filpper lengths across all species are equal
+#HA: at least two means differ significantly
+penguin_aov <-aov(flipper_length ~ common_name, data = penguins2)
+summary(penguin_aov)
+#At least two sample were taken from the populations with different means.
+
+#Which one is different? all three different from each other?
+#post_hoc testing using Tukey's HSD
+penguin_ph <- TukeyHSD(penguin_aov)
+penguin_ph
+
+#mean ....are all significantly different from each other.
+```
+
+Mean flipper lengths for A G C are significantly different(F(df)= .., p <0.001, $\alpha\ = 0.05)$ with post-hoc TUkey's HSD $\alpha\ = 0.05$.
+
